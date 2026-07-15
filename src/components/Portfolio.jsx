@@ -89,7 +89,7 @@ export default function Portfolio() {
               </div>
               <div style={{ display: 'flex', gap: '1.6rem', alignItems: 'center' }}>
                 <span style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', color: 'var(--gold-dim)', letterSpacing: '.2em' }}>
-                  No. {['I', 'II', 'III'][i]}
+                  No. {['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][i]}
                 </span>
                 <button className="pf-open" onClick={() => setOpenId(p.id)}>View Transformation</button>
               </div>
