@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://pranaygoud604.github.io/Vitara-Interior-3D/sitemap.xml
