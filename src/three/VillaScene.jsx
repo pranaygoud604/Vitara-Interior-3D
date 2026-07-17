@@ -9,6 +9,7 @@ import {
 } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette, DepthOfField } from '@react-three/postprocessing'
 import * as THREE from 'three'
+import { TIER_SETTINGS } from '../hooks/useDeviceTier.js'
 
 /* ------------------------------------------------------------------ */
 /* Camera dolly: scroll progress (0..1) drives a slow entry path       */
@@ -35,11 +36,16 @@ function CinematicCamera({ progress }) {
 /* ------------------------------------------------------------------ */
 /* Animated sheer curtain — vertex-waved plane                          */
 /* ------------------------------------------------------------------ */
-function Curtain({ position, width = 2.2, height = 4.6 }) {
+function Curtain({ position, width = 2.2, height = 4.6, segments = 32, cheap = false }) {
   const ref = useRef()
-  const geo = useMemo(() => new THREE.PlaneGeometry(width, height, 32, 24), [width, height])
+  const frame = useRef(0)
+  const geo = useMemo(() => new THREE.PlaneGeometry(width, height, segments, Math.round(segments * 0.75)), [width, height, segments])
   const base = useMemo(() => geo.attributes.position.array.slice(), [geo])
   useFrame(({ clock }) => {
+    frame.current++
+    // Skip every other frame on lower tiers — the wave is slow enough
+    // that halving its update rate is visually indistinguishable.
+    if (cheap && frame.current % 2 === 0) return
     const t = clock.elapsedTime
     const pos = ref.current.geometry.attributes.position
     for (let i = 0; i < pos.count; i++) {
@@ -70,7 +76,7 @@ function Curtain({ position, width = 2.2, height = 4.6 }) {
 /* ------------------------------------------------------------------ */
 /* Floating dust particles in the sun shaft                            */
 /* ------------------------------------------------------------------ */
-function DustParticles({ count = 220 }) {
+function DustParticles({ count }) {
   const ref = useRef()
   const positions = useMemo(() => {
     const arr = new Float32Array(count * 3)
@@ -106,17 +112,17 @@ function DustParticles({ count = 220 }) {
 /* ------------------------------------------------------------------ */
 /* The villa volume — marble, walnut, glass, brass                      */
 /* ------------------------------------------------------------------ */
-function Villa() {
+function Villa({ settings }) {
   return (
     <group>
-      {/* marble floor with real reflections */}
+      {/* marble floor with real reflections (quality scales with device tier) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[24, 30]} />
         <MeshReflectorMaterial
-          blur={[380, 120]}
-          resolution={1024}
-          mixBlur={0.9}
-          mixStrength={5}
+          blur={settings.reflector.blur}
+          resolution={settings.reflector.resolution}
+          mixBlur={settings.reflector.mixBlur}
+          mixStrength={settings.reflector.mixStrength}
           roughness={0.55}
           depthScale={1.1}
           minDepthThreshold={0.4}
@@ -179,9 +185,9 @@ function Villa() {
         </mesh>
       ))}
 
-      {/* curtains at glazing */}
-      <Curtain position={[-6.5, 2.35, -3.2]} />
-      <Curtain position={[-6.5, 2.35, 0.4]} />
+      {/* curtains at glazing — lighter mesh + throttled update below 'high' tier */}
+      <Curtain position={[-6.5, 2.35, -3.2]} segments={settings.dpr[1] >= 1.75 ? 32 : 18} cheap={settings.dpr[1] < 1.75} />
+      <Curtain position={[-6.5, 2.35, 0.4]} segments={settings.dpr[1] >= 1.75 ? 32 : 18} cheap={settings.dpr[1] < 1.75} />
 
       {/* brass-framed glass partition (right) */}
       <mesh position={[5.4, 2.2, -2.5]}>
@@ -264,8 +270,8 @@ function Villa() {
         </mesh>
       </group>
 
-      <ContactShadows position={[0, 0.01, 0]} opacity={0.55} scale={22} blur={2.4} far={4} resolution={512} color="#000000" />
-      <DustParticles />
+      <ContactShadows position={[0, 0.01, 0]} opacity={0.55} scale={22} blur={2.4} far={4} resolution={settings.contactShadowRes} color="#000000" />
+      <DustParticles count={settings.dustCount} />
     </group>
   )
 }
@@ -273,17 +279,21 @@ function Villa() {
 /* ------------------------------------------------------------------ */
 /* Scene wrapper                                                       */
 /* ------------------------------------------------------------------ */
-export default function VillaScene({ progress }) {
+export default function VillaScene({ progress, tier = 'high', active = true }) {
   const reduced =
     typeof window !== 'undefined' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
+  const settings = TIER_SETTINGS[tier] || TIER_SETTINGS.high
+
   return (
     <Canvas
-      dpr={[1, 1.75]}
-      gl={{ antialias: true, powerPreference: 'high-performance' }}
+      dpr={settings.dpr}
+      gl={{ antialias: settings.antialias, powerPreference: settings.powerPreference, alpha: false }}
       camera={{ position: [0, 2.4, 13.5], fov: 42 }}
       shadows={false}
+      frameloop={active ? 'always' : 'never'}
+      aria-label="Cinematic 3D villa walkthrough"
     >
       <color attach="background" args={['#0a0908']} />
       <fog attach="fog" args={['#0a0908', 16, 30]} />
@@ -294,20 +304,22 @@ export default function VillaScene({ progress }) {
       <ambientLight intensity={0.22} color="#c9baa0" />
 
       {/* offline HDRI-style environment built from lightformers */}
-      <Environment resolution={256}>
+      <Environment resolution={tier === 'low' ? 128 : 256}>
         <Lightformer intensity={1.6} color="#ffe6bd" position={[-6, 3, 0]} rotation-y={Math.PI / 2} scale={[9, 5, 1]} />
         <Lightformer intensity={0.5} color="#c8a76b" position={[0, 5, -5]} scale={[12, 1, 1]} />
         <Lightformer intensity={0.35} color="#8fa2b5" position={[6, 4, 4]} rotation-y={-Math.PI / 2} scale={[6, 3, 1]} />
       </Environment>
 
-      <Villa />
+      <Villa settings={settings} />
       {!reduced && <CinematicCamera progress={progress} />}
 
-      <EffectComposer multisampling={0}>
-        <Bloom intensity={0.55} luminanceThreshold={0.75} luminanceSmoothing={0.3} mipmapBlur />
-        <DepthOfField focusDistance={0.012} focalLength={0.05} bokehScale={2.2} />
-        <Vignette eskil={false} offset={0.22} darkness={0.85} />
-      </EffectComposer>
+      {(settings.bloom || settings.dof || settings.vignette) && (
+        <EffectComposer multisampling={0}>
+          {settings.bloom && <Bloom intensity={0.55} luminanceThreshold={0.75} luminanceSmoothing={0.3} mipmapBlur={tier === 'high'} />}
+          {settings.dof && <DepthOfField focusDistance={0.012} focalLength={0.05} bokehScale={2.2} />}
+          {settings.vignette && <Vignette eskil={false} offset={0.22} darkness={0.85} />}
+        </EffectComposer>
+      )}
     </Canvas>
   )
 }

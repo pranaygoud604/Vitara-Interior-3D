@@ -1,11 +1,15 @@
 import { useRef, useEffect, Suspense, lazy } from 'react'
 import { motion } from 'framer-motion'
+import { useDeviceTier } from '../hooks/useDeviceTier.js'
+import { useActiveWhenVisible } from '../hooks/useActiveWhenVisible.js'
 
 const VillaScene = lazy(() => import('../three/VillaScene.jsx'))
 
 export default function Hero() {
   const wrapRef = useRef(null)
   const progress = useRef(0)
+  const tier = useDeviceTier()
+  const { ref: visRef, active } = useActiveWhenVisible('300px')
 
   useEffect(() => {
     const fn = () => {
@@ -20,12 +24,17 @@ export default function Hero() {
     return () => window.removeEventListener('scroll', fn)
   }, [])
 
+  const setRefs = (el) => {
+    wrapRef.current = el
+    visRef.current = el
+  }
+
   return (
-    <div ref={wrapRef} id="top" style={{ height: '320vh', position: 'relative' }}>
+    <div ref={setRefs} id="top" style={{ height: '320vh', position: 'relative' }}>
       <div style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
         <Suspense fallback={<div style={{ position: 'absolute', inset: 0, background: 'var(--ink)' }} />}>
           <div style={{ position: 'absolute', inset: 0 }}>
-            <VillaScene progress={progress} />
+            <VillaScene progress={progress} tier={tier} active={active} />
           </div>
         </Suspense>
 

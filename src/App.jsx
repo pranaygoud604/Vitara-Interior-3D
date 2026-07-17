@@ -38,9 +38,26 @@ export default function App() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const lenis = new Lenis({ lerp: 0.08, smoothWheel: true })
     lenis.on('scroll', ScrollTrigger.update)
-    const raf = (t) => { lenis.raf(t); requestAnimationFrame(raf) }
-    requestAnimationFrame(raf)
-    return () => lenis.destroy()
+
+    let rafId
+    let paused = false
+    const raf = (t) => {
+      if (!paused) lenis.raf(t)
+      rafId = requestAnimationFrame(raf)
+    }
+    rafId = requestAnimationFrame(raf)
+
+    const onVis = () => {
+      paused = document.hidden
+      if (!paused) lenis.start()
+    }
+    document.addEventListener('visibilitychange', onVis)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      document.removeEventListener('visibilitychange', onVis)
+      lenis.destroy()
+    }
   }, [])
 
   return (

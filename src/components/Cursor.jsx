@@ -15,27 +15,23 @@ export default function Cursor() {
       if (ring.current) ring.current.style.transform = `translate(${rx}px,${ry}px)`
       raf = requestAnimationFrame(loop)
     }
-    const grow = () => ring.current?.classList.add('grow')
-    const shrink = () => ring.current?.classList.remove('grow')
-    window.addEventListener('mousemove', move)
-    document.querySelectorAll('a, button, [data-hover]').forEach((el) => {
-      el.addEventListener('mouseenter', grow)
-      el.addEventListener('mouseleave', shrink)
-    })
-    const mo = new MutationObserver(() => {
-      document.querySelectorAll('a, button, [data-hover]').forEach((el) => {
-        el.removeEventListener('mouseenter', grow)
-        el.removeEventListener('mouseleave', shrink)
-        el.addEventListener('mouseenter', grow)
-        el.addEventListener('mouseleave', shrink)
-      })
-    })
-    mo.observe(document.body, { childList: true, subtree: true })
+    // Event delegation: one pair of listeners on document instead of
+    // re-scanning + re-binding to every <a>/<button> on every DOM mutation.
+    const onOver = (e) => {
+      if (e.target.closest('a, button, [data-hover]')) ring.current?.classList.add('grow')
+    }
+    const onOut = (e) => {
+      if (e.target.closest('a, button, [data-hover]')) ring.current?.classList.remove('grow')
+    }
+    window.addEventListener('mousemove', move, { passive: true })
+    document.addEventListener('mouseover', onOver)
+    document.addEventListener('mouseout', onOut)
     loop()
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('mousemove', move)
-      mo.disconnect()
+      document.removeEventListener('mouseover', onOver)
+      document.removeEventListener('mouseout', onOut)
     }
   }, [])
 

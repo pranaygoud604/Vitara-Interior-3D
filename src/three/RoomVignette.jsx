@@ -12,7 +12,7 @@ function Slow({ children }) {
   return <group ref={g}>{children}</group>
 }
 
-function RoomSet({ room }) {
+function RoomSet({ room, shadowRes = 256 }) {
   return (
     <Slow>
       {/* floor */}
@@ -49,24 +49,32 @@ function RoomSet({ room }) {
         <boxGeometry args={[8.6, 0.05, 0.05]} />
         <meshStandardMaterial color={room.accent} emissive={room.accent} emissiveIntensity={2.2} />
       </mesh>
-      <ContactShadows position={[0, 0.01, 0]} opacity={0.5} scale={10} blur={2.2} far={2.5} resolution={256} />
+      <ContactShadows position={[0, 0.01, 0]} opacity={0.5} scale={10} blur={2.2} far={2.5} resolution={shadowRes} />
     </Slow>
   )
 }
 
-export default function RoomVignette({ room, light = 0.7 }) {
+export default function RoomVignette({ room, light = 0.7, tier = 'high', active = true }) {
+  const dpr = tier === 'low' ? [1, 1] : tier === 'mid' ? [1, 1.4] : [1, 1.6]
+  const shadowRes = tier === 'low' ? 128 : tier === 'mid' ? 192 : 256
   return (
-    <Canvas dpr={[1, 1.5]} camera={{ position: [0, 1.7, 4.6], fov: 40 }} gl={{ antialias: true }}>
+    <Canvas
+      dpr={dpr}
+      camera={{ position: [0, 1.7, 4.6], fov: 40 }}
+      gl={{ antialias: tier === 'high', powerPreference: tier === 'low' ? 'low-power' : 'default' }}
+      frameloop={active ? 'always' : 'never'}
+      aria-label={`${room.name} 3D preview`}
+    >
       <color attach="background" args={['#0a0908']} />
       <fog attach="fog" args={['#0a0908', 7, 14]} />
       <ambientLight intensity={0.18 + light * 0.25} color="#c9baa0" />
       <directionalLight position={[-4, 4, 3]} intensity={0.6 + light * 2.2} color="#ffe9c4" />
       <pointLight position={[0, 2.6, -1]} intensity={light * 7} color={new THREE.Color(room.accent)} distance={6} decay={2} />
-      <Environment resolution={128}>
+      <Environment resolution={tier === 'low' ? 64 : 128}>
         <Lightformer intensity={0.5 + light} color="#ffe6bd" position={[-4, 3, 2]} scale={[6, 3, 1]} />
         <Lightformer intensity={0.4} color={room.accent} position={[4, 2, -2]} scale={[4, 2, 1]} />
       </Environment>
-      <RoomSet room={room} />
+      <RoomSet room={room} shadowRes={shadowRes} />
     </Canvas>
   )
 }

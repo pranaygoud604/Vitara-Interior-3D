@@ -1,6 +1,8 @@
 import { useState, Suspense, lazy } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ROOMS } from '../data/rooms.js'
+import { useDeviceTier } from '../hooks/useDeviceTier.js'
+import { useActiveWhenVisible } from '../hooks/useActiveWhenVisible.js'
 
 const RoomVignette = lazy(() => import('../three/RoomVignette.jsx'))
 
@@ -8,6 +10,8 @@ export default function RoomExplorer() {
   const [active, setActive] = useState(ROOMS[0])
   const [light, setLight] = useState(0.7) // user lighting control
   const [hotspot, setHotspot] = useState(null)
+  const tier = useDeviceTier()
+  const { ref: stageRef, active: stageVisible } = useActiveWhenVisible('150px')
 
   return (
     <section id="walkthrough" style={{ padding: '14vh 0', background: 'var(--char)', borderTop: '1px solid var(--hair)', borderBottom: '1px solid var(--hair)' }}>
@@ -61,9 +65,9 @@ export default function RoomExplorer() {
         </div>
 
         <div className="re-grid">
-          <div className="re-stage">
+          <div className="re-stage" ref={stageRef}>
             <Suspense fallback={null}>
-              <RoomVignette room={active} light={light} />
+              <RoomVignette room={active} light={light} tier={tier} active={stageVisible} />
             </Suspense>
 
             {/* interactive hotspots */}
